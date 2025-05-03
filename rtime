@@ -1,0 +1,502 @@
+#!/usr/local/venv/bin/python3
+
+import argparse
+import sqlite3
+import os
+import hashlib
+from datetime import datetime
+
+# 默认的数据库路径
+DEF_DB_PATH = os.path.expanduser("~/.config/rtime/rtime.db")
+DB_PATH = ""
+
+# 创建数据库连接
+def get_db_connection():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# 创建项目表，任务表和记录表
+def init_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS projects (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE
+                    )''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS tasks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE,
+                        project_id INTEGER,
+                        FOREIGN KEY (project_id) REFERENCES projects(id)
+                    )''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS records (
+                        id TEXT PRIMARY KEY,
+                        task_id INTEGER,
+                        project_id INTEGER,
+                        start_time DATETIME,
+                        end_time DATETIME,
+                        message TEXT,
+                        status TEXT,
+                        FOREIGN KEY (task_id) REFERENCES tasks(id),
+                        FOREIGN KEY (project_id) REFERENCES projects(id)
+                    )''')
+    conn.commit()
+    conn.close()
+
+# 创建项目
+def create_project(name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO projects (name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
+    print(f"Project '{name}' created successfully.")
+
+# 显示所有项目
+def list_projects(args):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM projects")
+    projects = cursor.fetchall()
+    if not projects:
+        print("No projects found.")
+    else:
+        for project in projects:
+            project_id = project['id']
+            cursor.execute("SELECT SUM(strftime('%s', end_time) - strftime('%s', start_time)) FROM records WHERE project_id = ?", (project_id,))
+            elapsed_time_seconds = cursor.fetchone()[0] or 0
+
+            # 将秒数格式化为时间字符串
+            days = int(elapsed_time_seconds // (3600 * 24))
+            hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
+            minutes = int((elapsed_time_seconds % 3600) // 60)
+            seconds = int(elapsed_time_seconds % 60)
+
+            # 创建一个时间字符串
+            elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
+
+            print(f"Project: {project['name']}, Total Time: {days} {elapsed_time}")
+    conn.close()
+
+# 删除项目
+def delete_project(name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 获取项目 ID
+    cursor.execute("SELECT id FROM projects WHERE name = ?", (name,))
+    project = cursor.fetchone()
+    
+    if not project:
+        print(f"Project '{name}' not found.")
+        conn.close()
+        return
+    
+    project_id = project['id']
+    
+    # 删除与项目关联的任务下的所有项
+    cursor.execute(" DELETE FROM records WHERE task_id IN ( SELECT task_id FROM tasks WHERE project_id = ?) ", (project_id,))
+    
+    # 删除与项目关联的所有任务
+    cursor.execute("DELETE FROM tasks WHERE project_id = ?", (project_id,))
+    
+    # 删除项目本身
+    cursor.execute("DELETE FROM projects WHERE name = ?", (name,))
+    
+    # 提交事务
+    conn.commit()
+    conn.close()
+    print(f"Project '{name}' and its tasks and items deleted successfully.")
+
+# 创建任务
+def create_task(name, project_name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+    project = cursor.fetchone()
+    if not project:
+        print(f"Project '{project_name}' not found.")
+        return
+    cursor.execute("INSERT INTO tasks (name, project_id) VALUES (?, ?)", (name, project['id']))
+    conn.commit()
+    conn.close()
+    print(f"Task '{name}' created under project '{project_name}'.")
+
+# 删除任务
+def delete_task(name, project_name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 获取项目 ID
+    cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+    project = cursor.fetchone()
+    
+    if not project:
+        print(f"Project '{project_name}' not found.")
+        conn.close()
+        return
+    
+    project_id = project['id']
+    
+    # 获取任务 ID
+    cursor.execute("SELECT id FROM tasks WHERE name = ? AND project_id = ?", (name, project_id))
+    task = cursor.fetchone()
+    
+    if not task:
+        print(f"Task '{name}' not found in project '{project_name}'.")
+        conn.close()
+        return
+    
+    task_id = task['id']
+    
+    # 删除与任务关联的所有项
+    cursor.execute("DELETE FROM records  WHERE task_id = ?", (task_id,))
+    
+    # 删除任务本身
+    cursor.execute("DELETE FROM tasks WHERE name = ? AND project_id = ?", (name, project_id))
+    
+    # 提交事务
+    conn.commit()
+    conn.close()
+    print(f"Task '{name}' and its items deleted from project '{project_name}'.")
+
+# 显示任务
+def list_tasks(project_name):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+    project = cursor.fetchone()
+    if not project:
+        print(f"Project '{project_name}' not found.")
+        return
+    cursor.execute("SELECT * FROM tasks WHERE project_id = ?", (project['id'],))
+    tasks = cursor.fetchall()
+    if not tasks:
+        print("No tasks found for this project.")
+    else:
+        for task in tasks:
+            task_id = task['id']
+            cursor.execute("SELECT SUM(strftime('%s', end_time) - strftime('%s', start_time)) FROM records WHERE task_id = ?", (task_id,))
+            elapsed_time_seconds = cursor.fetchone()[0] or 0
+
+            # 将秒数格式化为时间字符串
+            days = int(elapsed_time_seconds // (3600 * 24))
+            hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
+            minutes = int((elapsed_time_seconds % 3600) // 60)
+            seconds = int(elapsed_time_seconds % 60)
+
+            # 创建一个时间字符串
+            elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
+            print(f"Task: {task['name']}, Total Time: {days} {elapsed_time}")
+    conn.close()
+
+# 开始记录时间
+def track_time(project_name, task_name, message):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 查找项目和任务
+    if project_name:
+        cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+        project = cursor.fetchone()
+        if not project:
+            print(f"Project '{project_name}' not found.")
+            return
+        if task_name:
+            cursor.execute("SELECT id FROM tasks WHERE name = ? AND project_id = ?", (task_name, project['id']))
+            task = cursor.fetchone()
+            if not task:
+                print(f"Task '{task_name}' not found in Project '{project_name}'.")
+                return
+            project_id, task_id = project['id'], task['id']
+        else:
+            project_id, task_id = project['id'], None
+    else:
+        project_id, task_id = None, None
+
+    # 生成记录ID
+    record_id = hashlib.md5(f"{project_id}-{task_id}-{message}-{datetime.now()}".encode()).hexdigest()
+
+    # 获取当前时间
+    start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # 插入记录
+    cursor.execute("INSERT INTO records (id, task_id, project_id, start_time, status, message) VALUES (?, ?, ?, ?, ?, ?)",
+                   (record_id, task_id, project_id, start_time, "running", message))
+    conn.commit()
+    conn.close()
+    print(f"Time tracking started with ID: {record_id}")
+
+# 结束记录时间
+def finish_time(args):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 查找正在运行的任务
+    cursor.execute("SELECT * FROM records WHERE status = 'running' LIMIT 1")
+    record = cursor.fetchone()
+
+    if not record:
+        print("No running task found.")
+        return
+
+    # 获取结束时间并转换为字符串
+    end_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # 更新记录
+    cursor.execute("UPDATE records SET end_time = ?, status = 'finished' WHERE id = ?",
+                   (end_time, record['id']))
+    conn.commit()
+
+    # 计算已用时间（秒）
+    cursor.execute("SELECT strftime('%s', end_time) - strftime('%s', start_time) FROM records WHERE id = ?", (record['id'],))
+    elapsed_time_seconds = cursor.fetchone()[0] or 0
+
+    # 将秒数格式化为时间字符串
+    days = int(elapsed_time_seconds // (3600 * 24))
+    hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
+    minutes = int((elapsed_time_seconds % 3600) // 60)
+    seconds = int(elapsed_time_seconds % 60)
+
+    # 创建一个时间字符串
+    elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
+
+    print(f"Time tracking finished. Total time spent: {days} {elapsed_time}")
+    conn.close()
+
+# 显示记录，按项目和任务树状结构显示
+def list_records(args):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 查询所有项目
+    cursor.execute("SELECT id, name FROM projects")
+    projects = cursor.fetchall()
+
+    if not projects:
+        print("No projects found.")
+    else:
+        # 遍历项目
+        for project in projects:
+            print(f" Project {project['name']}:")
+            print("|")
+
+            # 获取该项目下的所有任务
+            cursor.execute("SELECT id, name FROM tasks WHERE project_id = ?", (project['id'],))
+            tasks = cursor.fetchall()
+
+            # 查找没有任务关联的记录
+            cursor.execute("SELECT id, start_time, end_time, message FROM records WHERE task_id IS NULL and project_id IS NOT NULL")
+            orphan_records = cursor.fetchall()
+
+            if orphan_records:
+                print("|--->Orphan Records (No Associated Task):")
+                for record in orphan_records:
+                    start_time = record['start_time']
+                    end_time = record['end_time'] if record['end_time'] else "Running"
+
+                    # 解析时间
+                    start_time_obj = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                    if end_time != "Running":
+                        end_time_obj = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+                    else:
+                        end_time_obj = datetime.now()
+
+                    # 计算时间差
+                    if not record['end_time']:
+                        elapsed_time_seconds = (datetime.now() - start_time_obj).total_seconds()
+                    else:
+                        elapsed_time_seconds = (end_time_obj - start_time_obj).total_seconds()
+
+                    # 将秒数格式化为时间字符串
+                    days = int(elapsed_time_seconds // (3600 * 24))
+                    hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
+                    minutes = int((elapsed_time_seconds % 3600) // 60)
+                    seconds = int(elapsed_time_seconds % 60)
+
+                    # 创建一个时间字符串
+                    elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
+
+                    # 输出孤立记录
+                    print(f"|      |-ID: {record['id']}, Start: {start_time}, End: {end_time}, Time Spent: {days} {elapsed_time}, Message: {record['message']}")
+
+            if not tasks:
+                print(f"  No tasks found for project {project['name']}.")
+            else:
+                # 遍历任务
+                for task in tasks:
+                    print(f"|--->Task {task['name']}:")
+
+                    # 获取该任务下的所有记录
+                    cursor.execute("SELECT id, start_time, end_time, message FROM records WHERE task_id = ?", (task['id'],))
+                    records = cursor.fetchall()
+
+                    if not records:
+                        print("|      No records found for this task.")
+                    else:
+                        # 遍历并显示每条记录
+                        for record in records:
+                            start_time = record['start_time']
+                            end_time = record['end_time'] if record['end_time'] else "Running"
+
+                            # 解析时间
+                            start_time_obj = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                            if end_time != "Running":
+                                end_time_obj = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+                            else:
+                                end_time_obj = datetime.now()
+
+                            # 计算时间差
+                            if not record['end_time']:
+                                elapsed_time_seconds = (datetime.now() - start_time_obj).total_seconds()
+                            else:
+                                elapsed_time_seconds = (end_time_obj - start_time_obj).total_seconds()
+
+                            days = int(elapsed_time_seconds // (3600 * 24))
+                            hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
+                            minutes = int((elapsed_time_seconds % 3600) // 60)
+                            seconds = int(elapsed_time_seconds % 60)
+
+                            # 创建一个时间字符串
+                            elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
+
+                            # 输出记录
+                            print(f"|      |-ID: {record['id']}, Start: {start_time}, End: {end_time}, Time Spent: {days} {elapsed_time}, Message: {record['message']}")
+                    print("|    ---------TASK END---------")
+
+                print("|---------PROJECT END---------\n")
+
+    # 查找没有项目关联的记录
+    cursor.execute("SELECT id, start_time, end_time, message FROM records WHERE project_id IS NULL")
+    orphan_records = cursor.fetchall()
+
+    if orphan_records:
+        print(" Orphan Records (No Associated Project):")
+        print("|")
+        for record in orphan_records:
+            start_time = record['start_time']
+            end_time = record['end_time'] if record['end_time'] else "Running"
+
+            # 解析时间
+            start_time_obj = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            if end_time != "Running":
+                end_time_obj = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+            else:
+                end_time_obj = datetime.now()
+
+            # 计算时间差
+            if not record['end_time']:
+                elapsed_time_seconds = (datetime.now() - start_time_obj).total_seconds()
+            else:
+                elapsed_time_seconds = (end_time_obj - start_time_obj).total_seconds()
+
+            days = int(elapsed_time_seconds // (3600 * 24))
+            hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
+            minutes = int((elapsed_time_seconds % 3600) // 60)
+            seconds = int(elapsed_time_seconds % 60)
+
+            # 创建一个时间字符串
+            elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
+
+            # 输出孤立记录
+            print(f"|      |-ID: {record['id']}, Start: {start_time}, End: {end_time}, Time Spent: {days} {elapsed_time}, Message: {record['message']}")
+    conn.close()
+
+# 删除记录
+def delete_record(record_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM records WHERE id = ?", (record_id,))
+    conn.commit()
+    conn.close()
+    print(f"Record {record_id} deleted successfully.")
+
+# 显示命令行参数的函数
+def show_path(args):
+    if DEF_DB_PATH != DB_PATH:
+        print(f"Default Database Path: {DEF_DB_PATH}")
+        print(f"RTIME_DB_PATH: {DB_PATH}")
+    else:
+        print(f"Database Path: {DB_PATH}")
+
+# 主函数
+def main():
+    parser = argparse.ArgumentParser(prog="rtime")
+    subparsers = parser.add_subparsers()
+
+    # 创建项目
+    project_parser = subparsers.add_parser("project", help="Manage projects")
+    project_subparsers = project_parser.add_subparsers()
+
+    # 创建项目命令
+    create_project_parser = project_subparsers.add_parser("create", help="Create a new project")
+    create_project_parser.add_argument("project", help="Project name")
+    create_project_parser.set_defaults(func=lambda args: create_project(args.project))
+
+    # 列出项目命令
+    list_projects_parser = project_subparsers.add_parser("list", help="List all projects")
+    list_projects_parser.set_defaults(func=list_projects)
+
+    # 删除项目命令
+    delete_project_parser = project_subparsers.add_parser("delete", help="Delete a project")
+    delete_project_parser.add_argument("project", help="Project name")
+    delete_project_parser.set_defaults(func=lambda args: delete_project(args.project))
+
+    # 创建任务命令
+    task_parser = subparsers.add_parser("task", help="Manage tasks")
+    task_subparsers = task_parser.add_subparsers()
+
+    create_task_parser = task_subparsers.add_parser("create", help="Create a new task under a project")
+    create_task_parser.add_argument("task", help="Task name")
+    create_task_parser.add_argument("--project", required=True, help="The project under which the task will be created")
+    create_task_parser.set_defaults(func=lambda args: create_task(args.task, args.project))
+
+    delete_task_parser = task_subparsers.add_parser("delete", help="Delete a task from a project")
+    delete_task_parser.add_argument("task", help="Task name")
+    delete_task_parser.add_argument("--project", required=True, help="The project to delete the task from")
+    delete_task_parser.set_defaults(func=lambda args: delete_task(args.task, args.project))
+
+    list_tasks_parser = task_subparsers.add_parser("list", help="List all tasks under a project")
+    list_tasks_parser.add_argument("--project", required=True, help="Project name")
+    list_tasks_parser.set_defaults(func=lambda args: list_tasks(args.project))
+
+    # 记录时间命令
+    track_parser = subparsers.add_parser("track", help="Track time for a task or project")
+    track_parser.add_argument("--project", help="Project name")
+    track_parser.add_argument("--task", help="Task name")
+    track_parser.add_argument("-m", "--message", required=True, help="Message to attach to the time entry")
+    track_parser.set_defaults(func=lambda args: track_time(args.project, args.task, args.message))
+
+    # 结束时间命令
+    finish_parser = subparsers.add_parser("finish", help="Finish the current running time entry")
+    finish_parser.set_defaults(func=finish_time)
+
+    # 列出所有记录
+    list_parser = subparsers.add_parser("list", help="List all time records")
+    list_parser.set_defaults(func=list_records)
+
+    # 删除记录
+    delete_parser = subparsers.add_parser("delete", help="Delete a record by ID")
+    delete_parser.add_argument("id", help="Record ID")
+    delete_parser.set_defaults(func=lambda args: delete_record(args.id))
+
+    # 添加PATH
+    path_parser = subparsers.add_parser("path", help="Show DB_PATH(export RTIME_DB_PATH=\"/path/to/your/db\")")
+    path_parser.set_defaults(func=show_path)
+
+    # 解析命令行参delete行相应操作
+    args = parser.parse_args()
+
+    if hasattr(args, 'func'):  # 检查是否有 'func' 属性
+        args.func(args)
+    else:
+        print("No command specified, use -h for help.")  # 如果没有指定命令，则打印提示
+
+if __name__ == "__main__":
+    # 设置DB_PATH
+    DB_PATH = os.getenv("RTIME_DB_PATH", DEF_DB_PATH)
+
+    init_db()  # 初始化数据库
+    main()
