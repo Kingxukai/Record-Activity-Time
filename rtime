@@ -1,5 +1,3 @@
-#!/usr/local/venv/bin/python3
-
 import argparse
 import sqlite3
 import os
@@ -421,6 +419,284 @@ def show_path(args):
     else:
         print(f"Database Path: {DB_PATH}")
 
+def parse_time(timestr):
+    try:
+        return datetime.fromisoformat(timestr)
+    except Exception:
+        return None
+
+def time_diff_seconds(start, end):
+    if not start or not end:
+        return 0
+    delta = end - start
+    return delta.total_seconds()
+
+def make_bar(value, max_value, max_width=30):
+    """
+    根据value和max_value绘制比例柱，最大宽度max_width，输出字符串示例：
+    value=30, max_value=60，则长度15(满宽度一半)
+    """
+    if max_value <= 0:
+        return ''
+    ratio = value / max_value
+    length = int(ratio * max_width)
+    return '█' * length + '-' * (max_width - length)
+
+class HeatmapStats:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def total_time_for_records(self, records):
+        """计算多条records的总时间，单位秒"""
+        total = 0
+        for r in records:
+            start_time = parse_time(r['start_time'])
+            end_time = parse_time(r['end_time'])
+            total += time_diff_seconds(start_time, end_time)
+        return total
+
+    def records_for_project(self, project_name):
+        """1. 指定project中，每个record的热力图"""
+        c = self.conn.cursor()
+        c.execute("SELECT id FROM projects WHERE name=?", (project_name,))
+        row = c.fetchone()
+        if not row:
+            print(f"No project named '{project_name}' found.")
+            return
+        project_id = row[0]
+
+        # 查询该项目下所有records（join tasks过滤task所属项目）
+        c.execute('''
+        SELECT records.id, records.message, records.start_time, records.end_time
+        FROM records
+        WHERE project_id=?
+        ''', (project_id,))
+        records = c.fetchall()
+        # 转成字典
+        records = [{'id': r[0], 'message': r[1], 'start_time': r[2], 'end_time': r[3]} for r in records]
+
+        # 处理记录，计算总时间
+        results = []
+        max_total = 0
+        for record in records:
+            st = parse_time(record['start_time'])
+            et = parse_time(record['end_time'])
+            total_time = time_diff_seconds(st, et)
+            if total_time > max_total:
+                max_total = total_time
+            results.append({
+                'id': record['id'],
+                'message': record['message'],
+                'total_time': total_time
+            })
+
+        # 打印热力图
+        self.print_heatmap(results, max_total, index="records")
+
+    def print_heatmap(self, results, max_total, index):
+        # 定义标题栏
+        if index == "project" or index == "task":
+            t_name = index + " Name"
+            title_name = t_name.ljust(55)  # 任务名称列，左对齐，占55个字符
+            title_heatmap = "Heatmap".ljust(30)  # 热力图列，左对齐，占30个字符
+            title_time = "Total Time"  # 时间列
+            print(f"{title_name} | {title_heatmap} | {title_time}")
+            print("-" * 60)  # 分隔线
+
+            # 打印每个任务的热力图
+            for result in results:
+                name = result['name'].ljust(55)  # 任务名称左对齐
+                total_time = result['total_time']
+                # 计算热力图的柱状图长度（假设最大长度为30个█）
+                bar_length = int(total_time / max_total * 30) if max_total > 0 else 0
+                heatmap = "█" * bar_length + " " * (28 - bar_length)  # 热力图列固定30字符
+                time_str = f"{total_time}s".ljust(10)  # 时间列左对齐
+                print(f"{name} | {heatmap} | {time_str}")
+        else:
+            title_id = "ID".ljust(32)  # ID 列，左对齐，占30个字符
+            title_message = "Message".ljust(20)  # Message 列，左对齐，占20个字符
+            title_heatmap = "Heatmap".ljust(30)  # 热力图列，左对齐，占30个字符
+            title_time = "Total Time"  # 时间列
+            print(f"{title_id} | {title_message} | {title_heatmap} | {title_time}")
+            print("-" * 65)  # 分隔线
+
+            for result in results:
+                id_str = str(result['id']).ljust(32)  # ID 列左对齐
+                message = result['message'][:18].ljust(20)  # Message 截断到18字符，左对齐
+                total_time = result['total_time']
+                # 计算热力图长度（最大28个█）
+                bar_length = int(total_time / max_total * 30) if max_total > 0 else 0
+                heatmap = "█" * bar_length + " " * (30 - bar_length)  # 热力图固定30字符
+                time_str = f"{int(total_time)}s".ljust(10)  # 时间列左对齐
+                print(f"{id_str} | {message} | {heatmap} | {time_str}")
+
+    def tasks_heatmap_for_project(self, project_name):
+        """2. 指定project中每个task的total_time热力图"""
+        c = self.conn.cursor()
+        c.execute("SELECT id FROM projects WHERE name=?", (project_name,))
+        row = c.fetchone()
+        if not row:
+            print(f"No project named '{project_name}' found.")
+            return
+        project_id = row[0]
+
+        # 查询该项目下所有task
+        c.execute("SELECT id, name FROM tasks WHERE project_id=?", (project_id,))
+        tasks = c.fetchall()
+        tasks = [{'id': t[0], 'name': t[1]} for t in tasks]
+        if not tasks:
+            print(f"No tasks found for project '{project_name}'")
+            return
+
+        results = []
+        max_total = 0
+        for task in tasks:
+            c.execute('''
+            SELECT start_time, end_time
+            FROM records
+            WHERE task_id=?
+            ''', (task['id'],))
+            recs = c.fetchall()
+            total_time = 0
+            for r in recs:
+                st = parse_time(r[0])
+                et = parse_time(r[1])
+                total_time += time_diff_seconds(st, et)
+            if total_time > max_total:
+                max_total = total_time
+            results.append({'name': task['name'], 'total_time': total_time})
+        self.print_heatmap(results, max_total, "task")
+
+        #return self._render_named_heatmap(results, max_total)
+
+    def records_heatmap_for_task(self, task_name):
+        """3. 指定task中每个record的热力图"""
+        c = self.conn.cursor()
+        c.execute("SELECT id FROM tasks WHERE name=?", (task_name,))
+        row = c.fetchone()
+        if not row:
+            print(f"No task named '{task_name}' found.")
+            return
+        task_id = row[0]
+
+        c.execute('''
+        SELECT id, message, start_time, end_time
+        FROM records
+        WHERE task_id=?
+        ''', (task_id,))
+        records = c.fetchall()
+        records = [{'id': r[0], 'message': r[1], 'start_time': r[2], 'end_time': r[3]} for r in records]
+
+        # 处理记录，计算总时间
+        results = []
+        max_total = 0
+        for record in records:
+            st = parse_time(record['start_time'])
+            et = parse_time(record['end_time'])
+            total_time = time_diff_seconds(st, et)
+            if total_time > max_total:
+                max_total = total_time
+            results.append({
+                'id': record['id'],
+                'message': record['message'],
+                'total_time': total_time
+            })
+
+        # 打印热力图
+        self.print_heatmap(results, max_total, index="records")
+
+    def projects_total_time_heatmap(self):
+        """4. 所有project的total_time热力图"""
+        c = self.conn.cursor()
+        c.execute("SELECT id, name FROM projects")
+        projects = c.fetchall()
+        projects = [{'id': p[0], 'name': p[1]} for p in projects]
+
+        results = []
+        max_total = 0
+        for project in projects:
+            # 查询该project的所有records时间总和（用project_id过滤）
+            c.execute('''
+            SELECT start_time, end_time FROM records WHERE project_id=?
+            ''', (project['id'],))
+            recs = c.fetchall()
+            total_time = 0
+            for r in recs:
+                st = parse_time(r[0])
+                et = parse_time(r[1])
+                total_time += time_diff_seconds(st, et)
+            if total_time > max_total:
+                max_total = total_time
+            results.append({'name': project['name'], 'total_time': total_time})
+        self.print_heatmap(results, max_total, "project")
+
+    def _render_named_heatmap(self, items, max_total):
+        """
+        items格式：[{'name':'xxx','total_time':秒数}]
+        绘制类热力柱状图，输出格式:
+        名称 | 柱状图 | 时间显示(秒/方便阅读)
+        """
+        lines = []
+        for item in items:
+            bar = make_bar(item['total_time'], max_total)
+            time_str = self._format_duration(item['total_time'])
+            line = f"{item['name']:<20} | {bar} | {time_str}"
+            lines.append(line)
+        return '\n'.join(lines)
+
+    def _render_record_heatmap(self, records):
+        """
+        输出record列表热力柱，格式:
+        id(short hash) | message | 柱状图 | 时间
+        """
+        # 找最大时间
+        max_total = 0
+        time_list = []
+        for r in records:
+            st = parse_time(r['start_time'])
+            et = parse_time(r['end_time'])
+            td = time_diff_seconds(st, et)
+            time_list.append(td)
+            if td > max_total:
+                max_total = td
+        lines = []
+        for i, r in enumerate(records):
+            bar = make_bar(time_list[i], max_total)
+            time_str = self._format_duration(time_list[i])
+            short_id = str(r['id'])[:8]
+            line = f"{short_id:<10} | {r['message']:<30} | {bar} | {time_str}"
+            lines.append(line)
+        return '\n'.join(lines)
+
+    def _format_duration(self, seconds):
+        if seconds <= 0:
+            return "0s"
+        m, s = divmod(int(seconds), 60)
+        h, m = divmod(m, 60)
+        parts = []
+        if h > 0:
+            parts.append(f"{h}h")
+        if m > 0:
+            parts.append(f"{m}m")
+        if s > 0:
+            parts.append(f"{s}s")
+        return ''.join(parts)
+
+def handle_heatmap(project, task, all):
+    conn = get_db_connection()
+    heatmap = HeatmapStats(conn)
+    if all:
+        heatmap.projects_total_time_heatmap()
+    elif project:
+        heatmap.records_for_project(project)
+        print()
+        heatmap.tasks_heatmap_for_project(project)
+
+    if task:
+        heatmap.records_heatmap_for_task(task)
+
+    conn.close()
+
 # 主函数
 def main():
     parser = argparse.ArgumentParser(prog="rtime")
@@ -485,6 +761,13 @@ def main():
     # 添加PATH
     path_parser = subparsers.add_parser("path", help="Show DB_PATH(export RTIME_DB_PATH=\"/path/to/your/db\")")
     path_parser.set_defaults(func=show_path)
+
+    # 热力图输出
+    heatmap_parser = subparsers.add_parser("stats", help="Show heatmap status")
+    heatmap_parser.add_argument("--project", help="Project Name")
+    heatmap_parser.add_argument("--task", help="Task Name")
+    heatmap_parser.add_argument("--all", help="All projects(bool)")
+    heatmap_parser.set_defaults(func=lambda args: handle_heatmap(args.project, args.task, args.all))
 
     # 解析命令行参delete行相应操作
     args = parser.parse_args()
