@@ -454,8 +454,7 @@ def show_path(args=None):
     if os.path.expanduser(DEF_DB_PATH) != DB_PATH:
         print("Default Database Path: " + Fore.YELLOW + f" {os.path.expanduser(DEF_DB_PATH)}" + Fore.RESET)
         print("RTIME_DB_PATH: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
-    else:
-        print("Database Path: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
+    print("Database Path: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
 
 def parse_time(timestr):
     try:
