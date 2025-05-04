@@ -272,12 +272,14 @@ def list_records(args):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    no_project = 0
     # 查询所有项目
     cursor.execute("SELECT id, name FROM projects")
     projects = cursor.fetchall()
 
     if not projects:
         print(Fore.RED + "No projects found." + Fore.RESET)
+        no_project = 1
     else:
         # 遍历项目
         for project in projects:
@@ -414,6 +416,10 @@ def list_records(args):
                 print(Fore.BLUE + f"|      |-ID: {record['id']}, Start: {start_time}, End: {end_time}, Time Spent: {days} {elapsed_time}, Message: {record['message']}"+ Fore.RESET)
             else:
                 print(f"|      |-ID: {record['id']}, Start: {start_time}, End: {end_time}, Time Spent: {days} {elapsed_time}, Message: {record['message']}")
+    else:
+        if no_project:
+            print(Fore.RED + "No Records found." + Fore.RESET)
+
     conn.close()
 
 # 删除记录
