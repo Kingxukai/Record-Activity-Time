@@ -8,19 +8,31 @@ from datetime import datetime
 from colorama import Fore, init
 
 # 默认的数据库路径
-DEF_DB_PATH = os.path.expanduser("~/.config/rtime/rtime.db")
+DEF_DB_PATH = "~/.config/rtime/rtime.db"
 DB_PATH = ""
 
 # 创建数据库连接
 def get_db_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    if not os.path.exists(DB_PATH):
+        print(Fore.RED + "Database path " + Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " does not exist" + Fore.RESET)
+        exit(1)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 # 创建项目表，任务表和记录表
-def init_db():
-    conn = get_db_connection()
+def init_db(args=None):
+    if os.path.exists(DB_PATH):
+        print(Fore.YELLOW + f"{DB_PATH}" + Fore.GREEN + " exists." + Fore.RESET)
+        return
+
+    parent_dir = os.path.dirname(DB_PATH)
+    if parent_dir and not os.path.exists(parent_dir):
+        os.makedirs(parent_dir, exist_ok=True)
+        print(Fore.YELLOW + f"Directory {parent_dir}" + Fore.GREEN + " was created." + Fore.RESET)
+
+    conn = sqlite3.connect(DB_PATH)
+    print(Fore.YELLOW + f"{DB_PATH}" + Fore.GREEN + " was created." + Fore.RESET)
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS projects (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,6 +57,7 @@ def init_db():
                     )''')
     conn.commit()
     conn.close()
+    print(Fore.YELLOW + f"{DB_PATH}" + Fore.GREEN + " was initialized." + Fore.RESET)
 
 # 创建项目
 def create_project(name):
@@ -437,9 +450,9 @@ def delete_record(record_id):
     print(Fore.GREEN + "Record " +  Fore.YELLOW + f"{record_id}" + Fore.GREEN + " deleted successfully." + Fore.RESET)
 
 # 显示命令行参数的函数
-def show_path(args):
-    if DEF_DB_PATH != DB_PATH:
-        print("Default Database Path: " + Fore.YELLOW + f" {DEF_DB_PATH}" + Fore.RESET)
+def show_path(args=None):
+    if os.path.expanduser(DEF_DB_PATH) != DB_PATH:
+        print("Default Database Path: " + Fore.YELLOW + f" {os.path.expanduser(DEF_DB_PATH)}" + Fore.RESET)
         print("RTIME_DB_PATH: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
     else:
         print("Database Path: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
@@ -838,10 +851,26 @@ def rewrite_msg(id, msg):
     conn.commit()
     conn.close()
 
+def rm_db(args=None):
+    try:
+        os.remove(DB_PATH)
+        print(Fore.YELLOW + f"{DB_PATH}" + Fore.GREEN + " deleted.")
+    except FileNotFoundError:
+        print(Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " does not exists.")
+    except PermissionError:
+        print(Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " :No Permission to delete.")
+
+
 # 主函数
 def main():
     parser = argparse.ArgumentParser(prog="rtime")
     subparsers = parser.add_subparsers()
+
+    init_parser = subparsers.add_parser("init", help="Init database in DB_PATH")
+    init_parser.set_defaults(func=init_db)
+
+    rm_parser = subparsers.add_parser("rm", help="Remove database in DB_PATH")
+    rm_parser.set_defaults(func=rm_db)
 
     # 创建项目
     project_parser = subparsers.add_parser("project", help="Manage projects")
@@ -935,10 +964,15 @@ def main():
     else:
         print("No command specified, use -h for help.")  # 如果没有指定命令，则打印提示
 
-if __name__ == "__main__":
+def set_db_path():
     # 设置DB_PATH
+    global DB_PATH
     DB_PATH = os.getenv("RTIME_DB_PATH", DEF_DB_PATH)
+    if DB_PATH and DB_PATH == "":
+        DB_PATH = DEF_DB_PATH
+    DB_PATH = os.path.expanduser(DB_PATH)
 
+if __name__ == "__main__":
     init() # init color font
-    init_db()  # 初始化数据库
+    set_db_path()
     main()
