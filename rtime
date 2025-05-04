@@ -756,9 +756,11 @@ def validate_time_format(time_string):
 def modify_time(id, start_time, end_time):
     if start_time and not validate_time_format(start_time):
        print(Fore.RED + f"Invalid start_time format: " +  Fore.YELLOW + f"{start_time}" + Fore.RESET + ". Expected format is " + Fore.YELLOW + " \"YYYY-MM-DD H:M:S\"" + Fore.RESET + ".")
+       return
 
     if end_time and not validate_time_format(end_time):
        print(Fore.RED + f"Invalid end_time format: " +  Fore.YELLOW + f"{end_time}" + Fore.RESET + ". Expected format is " + Fore.YELLOW + " \"YYYY-MM-DD H:M:S\"" + Fore.RESET + ".")
+       return
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -777,6 +779,42 @@ def modify_time(id, start_time, end_time):
         cursor.execute("UPDATE records SET end_time = ?, start_time = ? WHERE id = ?",
                 ("2025-01-01 0:0:0", "2025-01-01 0:0:0", id,))
         
+    conn.commit()
+    conn.close()
+
+def move_record(id, project_name, task_name):
+    if task_name and not project_name:
+        print(Fore.RED + "Must specify project_name while specifing task_name." + Fore.RESET)
+        return
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    project_id_cursor = conn.cursor()
+    task_id_cursor = conn.cursor()
+
+    if task_name:
+        project_id_cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+        task_id_cursor.execute("SELECT id FROM tasks WHERE name = ?", (task_name,))
+        project_id = project_id_cursor.fetchone()[0]
+        task_id = task_id_cursor.fetchone()[0]
+        if not project_id or not task_id:
+            print(Fore.YELLOW + f"{project_name}" + Fore.RED + "or" + Fore.YELLOW + f"{task_name}" + Fore.RED + "not found." + Fore.RESET)
+            return
+
+        cursor.execute("UPDATE records SET task_id = ?, project_id = ? WHERE id = ?",
+                   (task_id, project_id, id,))
+    elif project_name:
+        project_id_cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+        project_id = project_id_cursor.fetchone()[0]
+        if not project_id:
+            print(Fore.YELLOW + f"{project_name}" + Fore.RED + "not found." + Fore.RESET)
+            return
+
+        cursor.execute("UPDATE records SET project_id = ? WHERE id = ?",
+                   (project_id, id,))
+    else:
+        print(Fore.RED + "No project or task specified." + Fore.RESET)
+
     conn.commit()
     conn.close()
 
@@ -838,7 +876,7 @@ def main():
 
     # 删除记录
     delete_parser = subparsers.add_parser("delete", help="Delete a record by ID")
-    delete_parser.add_argument("id", help="Record ID", type=int)
+    delete_parser.add_argument("id", help="Record ID", type=str)
     delete_parser.set_defaults(func=lambda args: delete_record(args.id))
 
     # 添加PATH
@@ -853,10 +891,16 @@ def main():
     heatmap_parser.set_defaults(func=lambda args: handle_heatmap(args.project, args.task, args.all))
 
     time_parser = subparsers.add_parser("time", help="Modify time")
-    time_parser.add_argument("--id", help="Specify record's id", required=True, type=int)
+    time_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
     time_parser.add_argument("--start_time", help="Start Time(Expected format is: \"YYYY-MM-DD H:M:S\")", type=str)
     time_parser.add_argument("--end_time", help="End Time(Expected format is: \"YYYY-MM-DD H:M:S\")", type=str)
     time_parser.set_defaults(func=lambda args: modify_time(args.id, args.start_time, args.end_time))
+
+    move_parser = subparsers.add_parser("move", help="Move a record under a project or task")
+    move_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
+    move_parser.add_argument("--project", help="Project Name", type=str)
+    move_parser.add_argument("--task", help="Task Name", type=str)
+    move_parser.set_defaults(func=lambda args: move_record(args.id, args.project, args.task))
 
     # 解析命令行参delete行相应操作
     args = parser.parse_args()
