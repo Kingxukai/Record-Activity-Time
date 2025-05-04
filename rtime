@@ -439,10 +439,10 @@ def delete_record(record_id):
 # 显示命令行参数的函数
 def show_path(args):
     if DEF_DB_PATH != DB_PATH:
-        print("Default Database Path: " + Fore.YELLOW + f" {DEF_DB_PATH}")
-        print("RTIME_DB_PATH: " + Fore.YELLOW + f"{DB_PATH}")
+        print("Default Database Path: " + Fore.YELLOW + f" {DEF_DB_PATH}" + Fore.RESET)
+        print("RTIME_DB_PATH: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
     else:
-        print("Database Path: " + Fore.YELLOW + f"{DB_PATH}")
+        print("Database Path: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
 
 def parse_time(timestr):
     try:
@@ -823,6 +823,21 @@ def move_record(id, project_name, task_name):
     conn.commit()
     conn.close()
 
+def rewrite_msg(id, msg):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM records WHERE id = ?", (id,))
+    record = cursor.fetchone()[0]
+    if not record:
+        print(Fore.YELLOW + f"{id}" + Fore.RED + "not found." + Fore.RESET)
+        return
+
+    cursor.execute("UPDATE records SET message = ? WHERE id = ?",
+               (msg, id,))
+    conn.commit()
+    conn.close()
+
 # 主函数
 def main():
     parser = argparse.ArgumentParser(prog="rtime")
@@ -906,6 +921,11 @@ def main():
     move_parser.add_argument("--project", help="Project Name", type=str)
     move_parser.add_argument("--task", help="Task Name", type=str)
     move_parser.set_defaults(func=lambda args: move_record(args.id, args.project, args.task))
+
+    msg_parser = subparsers.add_parser("msg", help="Modify a record's msg")
+    msg_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
+    msg_parser.add_argument("-m", "--message", help="New msg", required=True, type=str)
+    msg_parser.set_defaults(func=lambda args: rewrite_msg(args.id, args.message))
 
     # 解析命令行参delete行相应操作
     args = parser.parse_args()
