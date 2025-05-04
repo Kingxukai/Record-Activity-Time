@@ -654,6 +654,9 @@ class HeatmapStats:
         c = self.conn.cursor()
         c.execute("SELECT id, name FROM projects")
         projects = c.fetchall()
+        if not projects:
+            print(Fore.RED + "No Projects found." + Fore.RESET)
+            return
         projects = [{'id': p[0], 'name': p[1]} for p in projects]
 
         results = []
@@ -741,6 +744,42 @@ def handle_heatmap(project, task, all):
 
     conn.close()
 
+def validate_time_format(time_string):
+    """验证时间字符串是否符合 'YYYY-MM-DD H:M:S' 格式"""
+    try:
+        # 尝试解析时间字符串
+        return datetime.strptime(time_string, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        # 如果格式不匹配，抛出错误
+        return None
+
+def modify_time(id, start_time, end_time):
+    if start_time and not validate_time_format(start_time):
+       print(Fore.RED + f"Invalid start_time format: " +  Fore.YELLOW + f"{start_time}" + Fore.RESET + ". Expected format is " + Fore.YELLOW + " \"YYYY-MM-DD H:M:S\"" + Fore.RESET + ".")
+
+    if end_time and not validate_time_format(end_time):
+       print(Fore.RED + f"Invalid end_time format: " +  Fore.YELLOW + f"{end_time}" + Fore.RESET + ". Expected format is " + Fore.YELLOW + " \"YYYY-MM-DD H:M:S\"" + Fore.RESET + ".")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM records WHERE id = ?", (id,))
+    record = cursor.fetchone()
+    if start_time and end_time:
+        cursor.execute("UPDATE records SET end_time = ?, start_time = ? WHERE id = ?",
+                   (end_time, start_time, id,))
+    elif start_time and not end_time:
+        cursor.execute("UPDATE records SET start_time = ? WHERE id = ?",
+                   (start_time, id,))
+    elif not start_time and end_time:
+        cursor.execute("UPDATE records SET end_time = ?  WHERE id = ?",
+                   (end_time, id,))
+    else:
+        cursor.execute("UPDATE records SET end_time = ?, start_time = ? WHERE id = ?",
+                ("2025-01-01 0:0:0", "2025-01-01 0:0:0", id,))
+        
+    conn.commit()
+    conn.close()
+
 # 主函数
 def main():
     parser = argparse.ArgumentParser(prog="rtime")
@@ -752,7 +791,7 @@ def main():
 
     # 创建项目命令
     create_project_parser = project_subparsers.add_parser("create", help="Create a new project")
-    create_project_parser.add_argument("project", help="Project name")
+    create_project_parser.add_argument("project", help="Project name", type=str)
     create_project_parser.set_defaults(func=lambda args: create_project(args.project))
 
     # 列出项目命令
@@ -761,7 +800,7 @@ def main():
 
     # 删除项目命令
     delete_project_parser = project_subparsers.add_parser("delete", help="Delete a project")
-    delete_project_parser.add_argument("project", help="Project name")
+    delete_project_parser.add_argument("project", help="Project name", type=str)
     delete_project_parser.set_defaults(func=lambda args: delete_project(args.project))
 
     # 创建任务命令
@@ -769,24 +808,24 @@ def main():
     task_subparsers = task_parser.add_subparsers()
 
     create_task_parser = task_subparsers.add_parser("create", help="Create a new task under a project")
-    create_task_parser.add_argument("task", help="Task name")
-    create_task_parser.add_argument("--project", required=True, help="The project under which the task will be created")
+    create_task_parser.add_argument("task", help="Task name", type=str)
+    create_task_parser.add_argument("--project", required=True, help="The project under which the task will be created", type=str)
     create_task_parser.set_defaults(func=lambda args: create_task(args.task, args.project))
 
     delete_task_parser = task_subparsers.add_parser("delete", help="Delete a task from a project")
-    delete_task_parser.add_argument("task", help="Task name")
-    delete_task_parser.add_argument("--project", required=True, help="The project to delete the task from")
+    delete_task_parser.add_argument("task", help="Task name", type=str)
+    delete_task_parser.add_argument("--project", required=True, help="The project to delete the task from", type=str)
     delete_task_parser.set_defaults(func=lambda args: delete_task(args.task, args.project))
 
     list_tasks_parser = task_subparsers.add_parser("list", help="List all tasks under a project")
-    list_tasks_parser.add_argument("--project", required=True, help="Project name")
+    list_tasks_parser.add_argument("--project", required=True, help="Project name", type=str)
     list_tasks_parser.set_defaults(func=lambda args: list_tasks(args.project))
 
     # 记录时间命令
     track_parser = subparsers.add_parser("track", help="Track time for a task or project")
-    track_parser.add_argument("--project", help="Project name")
-    track_parser.add_argument("--task", help="Task name")
-    track_parser.add_argument("-m", "--message", required=True, help="Message to attach to the time entry")
+    track_parser.add_argument("--project", help="Project name", type=str)
+    track_parser.add_argument("--task", help="Task name", type=str)
+    track_parser.add_argument("-m", "--message", required=True, help="Message to attach to the time entry", type=str)
     track_parser.set_defaults(func=lambda args: track_time(args.project, args.task, args.message))
 
     # 结束时间命令
@@ -799,7 +838,7 @@ def main():
 
     # 删除记录
     delete_parser = subparsers.add_parser("delete", help="Delete a record by ID")
-    delete_parser.add_argument("id", help="Record ID")
+    delete_parser.add_argument("id", help="Record ID", type=int)
     delete_parser.set_defaults(func=lambda args: delete_record(args.id))
 
     # 添加PATH
@@ -808,10 +847,16 @@ def main():
 
     # 热力图输出
     heatmap_parser = subparsers.add_parser("stats", help="Show heatmap status")
-    heatmap_parser.add_argument("--project", help="Project Name")
-    heatmap_parser.add_argument("--task", help="Task Name")
-    heatmap_parser.add_argument("--all", help="All projects(bool)")
+    heatmap_parser.add_argument("--project", help="Project Name", type=str)
+    heatmap_parser.add_argument("--task", help="Task Name", type=str)
+    heatmap_parser.add_argument("--all", help="All projects(bool)", type=bool)
     heatmap_parser.set_defaults(func=lambda args: handle_heatmap(args.project, args.task, args.all))
+
+    time_parser = subparsers.add_parser("time", help="Modify time")
+    time_parser.add_argument("--id", help="Specify record's id", required=True, type=int)
+    time_parser.add_argument("--start_time", help="Start Time(Expected format is: \"YYYY-MM-DD H:M:S\")", type=str)
+    time_parser.add_argument("--end_time", help="End Time(Expected format is: \"YYYY-MM-DD H:M:S\")", type=str)
+    time_parser.set_defaults(func=lambda args: modify_time(args.id, args.start_time, args.end_time))
 
     # 解析命令行参delete行相应操作
     args = parser.parse_args()
