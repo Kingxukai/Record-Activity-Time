@@ -426,10 +426,15 @@ def list_records(args):
 def delete_record(record_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT * FROM records WHERE id = ?", (record_id,))
+    record = cursor.fetchone()
+    if not record:
+        print(Fore.RED + "No record found of id: " + Fore.YELLOW + f"{record_id}" + Fore.RESET)
+        return
     cursor.execute("DELETE FROM records WHERE id = ?", (record_id,))
     conn.commit()
     conn.close()
-    print(f"Record {record_id} deleted successfully.")
+    print(Fore.GREEN + "Record " +  Fore.YELLOW + f"{record_id}" + Fore.GREEN + " deleted successfully." + Fore.RESET)
 
 # 显示命令行参数的函数
 def show_path(args):
