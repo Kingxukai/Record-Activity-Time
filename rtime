@@ -890,11 +890,11 @@ def main():
     create_project_parser.set_defaults(func=lambda args: create_project(args.project))
 
     # 列出项目命令
-    list_projects_parser = project_subparsers.add_parser("list", help="List all projects")
+    list_projects_parser = project_subparsers.add_parser("ls", help="List all projects")
     list_projects_parser.set_defaults(func=list_projects)
 
     # 删除项目命令
-    delete_project_parser = project_subparsers.add_parser("delete", help="Delete a project")
+    delete_project_parser = project_subparsers.add_parser("rm", help="Delete a project")
     delete_project_parser.add_argument("project", help="Project name", type=str)
     delete_project_parser.set_defaults(func=lambda args: delete_project(args.project))
 
@@ -907,12 +907,12 @@ def main():
     create_task_parser.add_argument("--project", required=True, help="The project under which the task will be created", type=str)
     create_task_parser.set_defaults(func=lambda args: create_task(args.task, args.project))
 
-    delete_task_parser = task_subparsers.add_parser("delete", help="Delete a task from a project")
+    delete_task_parser = task_subparsers.add_parser("rm", help="Delete a task from a project")
     delete_task_parser.add_argument("task", help="Task name", type=str)
     delete_task_parser.add_argument("--project", required=True, help="The project to delete the task from", type=str)
     delete_task_parser.set_defaults(func=lambda args: delete_task(args.task, args.project))
 
-    list_tasks_parser = task_subparsers.add_parser("list", help="List all tasks under a project")
+    list_tasks_parser = task_subparsers.add_parser("ls", help="List all tasks under a project")
     list_tasks_parser.add_argument("--project", required=True, help="Project name", type=str)
     list_tasks_parser.set_defaults(func=lambda args: list_tasks(args.project))
 
@@ -928,11 +928,11 @@ def main():
     finish_parser.set_defaults(func=finish_time)
 
     # 列出所有记录
-    list_parser = subparsers.add_parser("list", help="List all time records")
+    list_parser = subparsers.add_parser("ls", help="List all time records")
     list_parser.set_defaults(func=list_records)
 
     # 删除记录
-    delete_parser = subparsers.add_parser("delete", help="Delete a record by ID")
+    delete_parser = subparsers.add_parser("rm", help="Delete a record by ID")
     delete_parser.add_argument("id", help="Record ID", type=str)
     delete_parser.set_defaults(func=lambda args: delete_record(args.id))
 
@@ -953,7 +953,7 @@ def main():
     time_parser.add_argument("--end_time", help="End Time(Expected format is: \"YYYY-MM-DD H:M:S\")", type=str)
     time_parser.set_defaults(func=lambda args: modify_time(args.id, args.start_time, args.end_time))
 
-    move_parser = subparsers.add_parser("move", help="Move a record under a project or task")
+    move_parser = subparsers.add_parser("mv", help="Move a record under a project or task")
     move_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
     move_parser.add_argument("--project", help="Project Name", type=str)
     move_parser.add_argument("--task", help="Task Name", type=str)
