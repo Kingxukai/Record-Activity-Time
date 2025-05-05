@@ -892,18 +892,19 @@ def rewrite_name(project_name, task_name, new_name):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if project_name:
-        cursor.execute("SELECT * FROM projects WHERE name = ?", (project_name,))
-        entry = cursor.fetchone()
-        if not entry:
-            print(Fore.YELLOW + f"{project_name}" + Fore.RED + " not found." + Fore.RESET)
-            return
+    cursor.execute("SELECT * FROM projects WHERE name = ?", (project_name,))
+    entry = cursor.fetchone()
+    if not entry:
+        print(Fore.YELLOW + f"{project_name}" + Fore.RED + " not found." + Fore.RESET)
+        return
+    project_id = entry['id']
+
+    if not task_name:
         cursor.execute("UPDATE projects SET name = ? WHERE name = ?",
                        (new_name, project_name,))
-
     else:
-        cursor.execute("SELECT * FROM tasks WHERE name = ?", (task_name,))
-        entry = cursor.fetchone()
+        cursor.execute("SELECT * FROM tasks WHERE name = ? and project_id = ?", (task_name, project_id,))
+        task_entry = cursor.fetchone()
         if not entry:
             print(Fore.YELLOW + f"{task_name}" + Fore.RED + " not found." + Fore.RESET)
             return
