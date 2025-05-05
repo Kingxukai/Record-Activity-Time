@@ -580,10 +580,12 @@ class HeatmapStats:
                 hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
                 minutes = int((elapsed_time_seconds % 3600) // 60)
                 seconds = int(elapsed_time_seconds % 60)
+                # 创建一个时间字符串
+                elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
                 # 计算热力图的柱状图长度（假设最大长度为50个█）
                 bar_length = int(elapsed_time_seconds / max_total * 50) if max_total > 0 else 0
                 heatmap = "█" * bar_length + " " * (50 - bar_length)
-                print(Fore.YELLOW + f"{name}" + Fore.RESET +" | " + Fore.RED + f"{heatmap}" + Fore.RESET + f" | {days}days, {hours}:{minutes}:{seconds}")
+                print(Fore.YELLOW + f"{name}" + Fore.RESET +" | " + Fore.RED + f"{heatmap}" + Fore.RESET + f" | {days} {elapsed_time}")
         else:
             title_id = "ID".ljust(32)  # ID 列，左对齐，占32个字符
             title_message = "Message".ljust(20)  # Message 列，左对齐，占20个字符
@@ -602,11 +604,12 @@ class HeatmapStats:
                 hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
                 minutes = int((elapsed_time_seconds % 3600) // 60)
                 seconds = int(elapsed_time_seconds % 60)
+                elapsed_time = f"day {hours:02}:{minutes:02}:{seconds:02}"
 
                 # 计算热力图长度（最大50个█）
                 bar_length = int(elapsed_time_seconds / max_total * 50) if max_total > 0 else 0
                 heatmap = "█" * bar_length + " " * (50 - bar_length)
-                print(Fore.YELLOW + f"{id_str}" + Fore.RESET + f" | {message} | " + Fore.BLUE + f"{heatmap}" + Fore.RESET + f" | {days}days, {hours}:{minutes}:{seconds}")
+                print(Fore.YELLOW + f"{id_str}" + Fore.RESET + f" | {message} | " + Fore.BLUE + f"{heatmap}" + Fore.RESET + f" | {days} {elapsed_time}")
         print()
 
     def tasks_heatmap_for_project(self, project_name):
