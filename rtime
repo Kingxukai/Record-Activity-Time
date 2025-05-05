@@ -239,7 +239,7 @@ def track_time(project_name, task_name, message):
             cursor.execute("SELECT id FROM tasks WHERE name = ? AND project_id = ?", (task_name, project['id']))
             task = cursor.fetchone()
             if not task:
-                print(f"Task '{task_name}' not found in Project '{project_name}'.")
+                print(Fore.RED + "Task " + Fore.YELLOW + f"{task_name}" + Fore.RED + " not found in Project " + Fore.YELLOW + f"{project_name}" + Fore.RESET +".")
                 return
             project_id, task_id = project['id'], task['id']
         else:
@@ -258,7 +258,7 @@ def track_time(project_name, task_name, message):
                    (record_id, task_id, project_id, start_time, "running", message))
     conn.commit()
     conn.close()
-    print(f"Time tracking started with ID: {record_id}")
+    print(Fore.GREEN + "Time tracking started with ID: " + Fore.YELLOW + f"{record_id}" + Fore.RESET)
 
 # 结束记录时间
 def finish_time(args):
