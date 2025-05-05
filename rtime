@@ -407,7 +407,7 @@ def list_records(args):
                                 
                 print(Fore.GREEN + "|    ---------TASK END---------"+ Fore.RESET)
 
-            print(Fore.YELLOW + "|---------PROJECT END---------\n"+ Fore.RESET)
+            print(Fore.GREEN + "|---------PROJECT END---------\n"+ Fore.RESET)
 
     # 查找没有项目关联的记录
     cursor.execute("SELECT id, start_time, end_time, message FROM records WHERE project_id IS NULL")
@@ -899,20 +899,34 @@ def rewrite_name(project_name, task_name, new_name):
         return
     project_id = entry['id']
 
+    cursor.execute("SELECT * FROM projects WHERE name = ?", (new_name,))
+    entry = cursor.fetchone()
+    if entry:
+        print(Fore.YELLOW + f"{new_name}" + Fore.RED + " already exists as a project name." + Fore.RESET)
+        return
+
     if not task_name:
         cursor.execute("UPDATE projects SET name = ? WHERE name = ?",
                        (new_name, project_name,))
     else:
         cursor.execute("SELECT * FROM tasks WHERE name = ? and project_id = ?", (task_name, project_id,))
         task_entry = cursor.fetchone()
-        if not entry:
+        if not task_entry:
             print(Fore.YELLOW + f"{task_name}" + Fore.RED + " not found." + Fore.RESET)
             return
+
+        cursor.execute("SELECT * FROM tasks WHERE name = ? and project_id = ?", (new_name, project_id,))
+        task_entry = cursor.fetchone()
+        if task_entry:
+            print(Fore.YELLOW + f"{new_name}" + Fore.RED + " already exists as a task name." + Fore.RESET)
+            return
+
         cursor.execute("UPDATE tasks SET name = ? WHERE name = ?",
                        (new_name, task_name,))
     
     conn.commit()
     conn.close()
+    print(Fore.GREEN + "Name updated successfully." + Fore.RESET)
 
 # 主函数
 def main():
