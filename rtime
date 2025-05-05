@@ -558,7 +558,7 @@ class HeatmapStats:
             title_heatmap = "Heatmap".ljust(30)  # 热力图列，左对齐，占30个字符
             title_time = "Total Time"  # 时间列
             print(f"{title_name} | {title_heatmap} | {title_time}")
-            print("-" * 60)  # 分隔线
+            print("-" * 120)  # 分隔线
 
             # 打印每个任务的热力图
             for result in results:
@@ -573,14 +573,14 @@ class HeatmapStats:
                 # 计算热力图的柱状图长度（假设最大长度为30个█）
                 bar_length = int(elapsed_time_seconds / max_total * 30) if max_total > 0 else 0
                 heatmap = "█" * bar_length + " " * (30 - bar_length)  # 热力图列固定30字符
-                print(f"{name} | {heatmap} | {days}days, {hours}:{minutes}:{seconds}")
+                print(Fore.YELLOW + f"{name}" + Fore.RESET +" | " + Fore.RED + f"{heatmap}" + Fore.RESET + f" | {days}days, {hours}:{minutes}:{seconds}")
         else:
             title_id = "ID".ljust(32)  # ID 列，左对齐，占30个字符
             title_message = "Message".ljust(20)  # Message 列，左对齐，占20个字符
             title_heatmap = "Heatmap".ljust(30)  # 热力图列，左对齐，占30个字符
             title_time = "Total Time"  # 时间列
             print(f"{title_id} | {title_message} | {title_heatmap} | {title_time}")
-            print("-" * 65)  # 分隔线
+            print("-" * 120)  # 分隔线
 
             for result in results:
                 id_str = str(result['id']).ljust(32)  # ID 列左对齐
@@ -596,7 +596,8 @@ class HeatmapStats:
                 # 计算热力图长度（最大30个█）
                 bar_length = int(elapsed_time_seconds / max_total * 30) if max_total > 0 else 0
                 heatmap = "█" * bar_length + " " * (30 - bar_length)  # 热力图固定30字符
-                print(f"{id_str} | {message} | {heatmap} | {days}days, {hours}:{minutes}:{seconds}")
+                print(Fore.YELLOW + f"{id_str}" + Fore.RESET + f" | {message} | " + Fore.BLUE + f"{heatmap}" + Fore.RESET + f" | {days}days, {hours}:{minutes}:{seconds}")
+        print()
 
     def tasks_heatmap_for_project(self, project_name):
         """2. 指定project中每个task的total_time热力图"""
