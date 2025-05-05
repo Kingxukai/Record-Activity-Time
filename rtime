@@ -849,13 +849,14 @@ def rewrite_msg(id, msg):
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM records WHERE id = ?", (id,))
-    record = cursor.fetchone()[0]
+    record = cursor.fetchone()
+    
     if not record:
-        print(Fore.YELLOW + f"{id}" + Fore.RED + "not found." + Fore.RESET)
+        print(Fore.YELLOW + f"{id}" + Fore.RED + " not found." + Fore.RESET)
         return
 
     cursor.execute("UPDATE records SET message = ? WHERE id = ?",
-               (msg, id,))
+                   (msg, id,))
     conn.commit()
     conn.close()
 
@@ -894,7 +895,7 @@ def main():
     list_projects_parser.set_defaults(func=list_projects)
 
     # 删除项目命令
-    delete_project_parser = project_subparsers.add_parser("rm", help="Delete a project")
+    delete_project_parser = project_subparsers.add_parser("delete", help="Delete a project")
     delete_project_parser.add_argument("project", help="Project name", type=str)
     delete_project_parser.set_defaults(func=lambda args: delete_project(args.project))
 
@@ -907,7 +908,7 @@ def main():
     create_task_parser.add_argument("--project", required=True, help="The project under which the task will be created", type=str)
     create_task_parser.set_defaults(func=lambda args: create_task(args.task, args.project))
 
-    delete_task_parser = task_subparsers.add_parser("rm", help="Delete a task from a project")
+    delete_task_parser = task_subparsers.add_parser("delete", help="Delete a task from a project")
     delete_task_parser.add_argument("task", help="Task name", type=str)
     delete_task_parser.add_argument("--project", required=True, help="The project to delete the task from", type=str)
     delete_task_parser.set_defaults(func=lambda args: delete_task(args.task, args.project))
@@ -932,7 +933,7 @@ def main():
     list_parser.set_defaults(func=list_records)
 
     # 删除记录
-    delete_parser = subparsers.add_parser("rm", help="Delete a record by ID")
+    delete_parser = subparsers.add_parser("delete", help="Delete a record by ID")
     delete_parser.add_argument("id", help="Record ID", type=str)
     delete_parser.set_defaults(func=lambda args: delete_record(args.id))
 
