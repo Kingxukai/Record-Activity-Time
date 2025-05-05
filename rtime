@@ -516,6 +516,7 @@ class HeatmapStats:
         row = c.fetchone()
         if not row:
             print(Fore.RED + "No project named " + Fore.YELLOW +f"{project_name}" + Fore.RED + " found."+ Fore.RESET)
+            exit(1)
         project_id = row[0]
 
         # 查询该项目下所有records（join tasks过滤task所属项目）
@@ -697,7 +698,7 @@ class HeatmapStats:
         projects = c.fetchall()
         if not projects:
             print(Fore.RED + "No Projects found." + Fore.RESET)
-            return
+            exit(1)
         projects = [{'id': p[0], 'name': p[1]} for p in projects]
 
         results = []
