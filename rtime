@@ -220,6 +220,14 @@ def track_time(project_name, task_name, message):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # 检查当前是否有正在运行的
+    cursor.execute("SELECT * FROM records WHERE status = 'running' LIMIT 1")
+    record = cursor.fetchone()
+
+    if record:
+        print(Fore.RED + "There is a record running, please run " + Fore.YELLOW + "rtime finish" + Fore.RED + " first" + Fore.RESET)
+        exit(1)
+
     # 查找项目和任务
     if project_name:
         cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
@@ -636,10 +644,17 @@ class HeatmapStats:
 
         #return self._render_named_heatmap(results, max_total)
 
-    def records_heatmap_for_task(self, task_name):
+    def records_heatmap_for_task(self, project_name, task_name):
         """3. 指定task中每个record的热力图"""
         c = self.conn.cursor()
-        c.execute("SELECT id FROM tasks WHERE name=?", (task_name,))
+        c.execute("SELECT id FROM projects WHERE name=?", (project_name,))
+        row = c.fetchone()
+        if not row:
+            print(Fore.RED + f"No project named " + Fore.YELLOW + f"{project_name}" + Fore.RED + " found." + Fore.RESET)
+            return
+        project_id = row[0]
+
+        c.execute("SELECT id FROM tasks WHERE name=? and project_id = ?", (task_name, project_id,))
         row = c.fetchone()
         if not row:
             print(Fore.RED + f"No task named " + Fore.YELLOW + f"{task_name}" + Fore.RED + " found." + Fore.RESET)
@@ -760,13 +775,15 @@ def handle_heatmap(project, task, all):
     heatmap = HeatmapStats(conn)
     if all:
         heatmap.projects_total_time_heatmap()
-    elif project:
+    elif project and not task:
         heatmap.records_for_project(project)
         print()
         heatmap.tasks_heatmap_for_project(project)
 
-    if task:
-        heatmap.records_heatmap_for_task(task)
+    if task and project:
+        heatmap.records_heatmap_for_task(project, task)
+    elif task and not project:
+        print(Fore.RED + "Must specify project while specify task." + Fore.RESET)
 
     conn.close()
 
@@ -809,10 +826,6 @@ def modify_time(id, start_time, end_time):
     conn.close()
 
 def move_record(id, project_name, task_name):
-    if task_name and not project_name:
-        print(Fore.RED + "Must specify project_name while specifing task_name." + Fore.RESET)
-        return
-
     conn = get_db_connection()
     cursor = conn.cursor()
     project_id_cursor = conn.cursor()
@@ -861,14 +874,44 @@ def rewrite_msg(id, msg):
     conn.close()
 
 def rm_db(args=None):
-    try:
-        os.remove(DB_PATH)
-        print(Fore.YELLOW + f"{DB_PATH}" + Fore.GREEN + " deleted.")
-    except FileNotFoundError:
-        print(Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " does not exists.")
-    except PermissionError:
-        print(Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " :No Permission to delete.")
+    confirm = input(Fore.RED + "Are you sure you want to rm the database" + Fore.YELLOW +f"({DB_PATH})" + "? Type" + Fore.BLUE + " y " + Fore.RED + "to confirm:" + Fore.RESET)
+    if confirm.lower() in ['y']:
+        try:
+            os.remove(DB_PATH)
+            print(Fore.YELLOW + f"{DB_PATH}" + Fore.GREEN + " deleted.")
+        except FileNotFoundError:
+            print(Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " does not exists.")
+        except PermissionError:
+            print(Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " :No Permission to delete.")
+    else:
+        print(Fore.GREEN + "Operation canceled.")
+        sys.exit(0)
 
+def rewrite_name(project_name, task_name, new_name):
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if project_name:
+        cursor.execute("SELECT * FROM projects WHERE name = ?", (project_name,))
+        entry = cursor.fetchone()
+        if not entry:
+            print(Fore.YELLOW + f"{project_name}" + Fore.RED + " not found." + Fore.RESET)
+            return
+        cursor.execute("UPDATE projects SET name = ? WHERE name = ?",
+                       (new_name, project_name,))
+
+    else:
+        cursor.execute("SELECT * FROM tasks WHERE name = ?", (task_name,))
+        entry = cursor.fetchone()
+        if not entry:
+            print(Fore.YELLOW + f"{task_name}" + Fore.RED + " not found." + Fore.RESET)
+            return
+        cursor.execute("UPDATE tasks SET name = ? WHERE name = ?",
+                       (new_name, task_name,))
+    
+    conn.commit()
+    conn.close()
 
 # 主函数
 def main():
@@ -956,7 +999,7 @@ def main():
 
     move_parser = subparsers.add_parser("mv", help="Move a record under a project or task")
     move_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
-    move_parser.add_argument("--project", help="Project Name", type=str)
+    move_parser.add_argument("--project", help="Project Name", required=True, type=str)
     move_parser.add_argument("--task", help="Task Name", type=str)
     move_parser.set_defaults(func=lambda args: move_record(args.id, args.project, args.task))
 
@@ -964,6 +1007,12 @@ def main():
     msg_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
     msg_parser.add_argument("-m", "--message", help="New msg", required=True, type=str)
     msg_parser.set_defaults(func=lambda args: rewrite_msg(args.id, args.message))
+
+    rename_parser = subparsers.add_parser("rename", help="Modify a task's or project's name")
+    rename_parser.add_argument("--project", help="Project Name", required=True, type=str)
+    rename_parser.add_argument("--task", help="Task Name", type=str)
+    rename_parser.add_argument("--name", help="New name", required=True, type=str)
+    rename_parser.set_defaults(func=lambda args: rewrite_name(args.project, args.task, args.name))
 
     # 解析命令行参delete行相应操作
     args = parser.parse_args()
