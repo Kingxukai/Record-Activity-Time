@@ -590,7 +590,7 @@ class HeatmapStats:
             title_heatmap = "Heatmap".ljust(50)  # 热力图列，左对齐，占50个字符
             title_time = "Total Time"  # 时间列
             print(f"{title_id} | {title_message} | {title_heatmap} | {title_time}")
-            print("-" * 120)  # 分隔线
+            print("-" * 135)  # 分隔线
 
             for result in results:
                 id_str = str(result['id']).ljust(32)  # ID 列左对齐
