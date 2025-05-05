@@ -782,6 +782,8 @@ def handle_heatmap(project, task, all):
         heatmap.tasks_heatmap_for_project(project)
 
     if task and project:
+        if all:
+            print()
         heatmap.records_heatmap_for_task(project, task)
     elif task and not project:
         print(Fore.RED + "Must specify project while specify task." + Fore.RESET)
@@ -1004,7 +1006,7 @@ def main():
     heatmap_parser = subparsers.add_parser("stats", help="Show heatmap status")
     heatmap_parser.add_argument("--project", help="Project Name", type=str)
     heatmap_parser.add_argument("--task", help="Task Name", type=str)
-    heatmap_parser.add_argument("--all", help="All projects(bool)", type=bool)
+    heatmap_parser.add_argument("--all", help="All projects", action='store_true')
     heatmap_parser.set_defaults(func=lambda args: handle_heatmap(args.project, args.task, args.all))
 
     time_parser = subparsers.add_parser("time", help="Modify time")
