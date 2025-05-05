@@ -500,6 +500,16 @@ class HeatmapStats:
     def __init__(self, conn):
         self.conn = conn
 
+    def format_column(self, text, width):
+        count = 0
+        for word in text:#检测长宽度中文字符
+            if (word >='\u4e00' and word <= '\u9fa5') or word in ['；','：','，','（','）','！','？','——','……','、','》','《']:
+                count += 1
+        if count*2 <= width:
+            return text.ljust(width-count)
+        else:
+            return text[:int(width/2)]
+
     def total_time_for_records(self, records):
         """计算多条records的总时间，单位秒"""
         total = 0
@@ -555,14 +565,14 @@ class HeatmapStats:
         if index == "project" or index == "task":
             t_name = index + " Name"
             title_name = t_name.ljust(55)  # 任务名称列，左对齐，占55个字符
-            title_heatmap = "Heatmap".ljust(30)  # 热力图列，左对齐，占30个字符
+            title_heatmap = "Heatmap".ljust(50)  # 热力图列，左对齐，占50个字符
             title_time = "Total Time"  # 时间列
             print(f"{title_name} | {title_heatmap} | {title_time}")
-            print("-" * 120)  # 分隔线
+            print("-" * 135)  # 分隔线
 
             # 打印每个任务的热力图
             for result in results:
-                name = result['name'].ljust(55)  # 任务名称左对齐
+                name = self.format_column(result['name'], 55)
                 elapsed_time_seconds = result['total_time']
 
                 # 将秒数格式化为时间字符串
@@ -570,21 +580,21 @@ class HeatmapStats:
                 hours = int((elapsed_time_seconds % (3600 * 24) ) // 3600)
                 minutes = int((elapsed_time_seconds % 3600) // 60)
                 seconds = int(elapsed_time_seconds % 60)
-                # 计算热力图的柱状图长度（假设最大长度为30个█）
-                bar_length = int(elapsed_time_seconds / max_total * 30) if max_total > 0 else 0
-                heatmap = "█" * bar_length + " " * (30 - bar_length)  # 热力图列固定30字符
+                # 计算热力图的柱状图长度（假设最大长度为50个█）
+                bar_length = int(elapsed_time_seconds / max_total * 50) if max_total > 0 else 0
+                heatmap = "█" * bar_length + " " * (50 - bar_length)
                 print(Fore.YELLOW + f"{name}" + Fore.RESET +" | " + Fore.RED + f"{heatmap}" + Fore.RESET + f" | {days}days, {hours}:{minutes}:{seconds}")
         else:
-            title_id = "ID".ljust(32)  # ID 列，左对齐，占30个字符
+            title_id = "ID".ljust(32)  # ID 列，左对齐，占32个字符
             title_message = "Message".ljust(20)  # Message 列，左对齐，占20个字符
-            title_heatmap = "Heatmap".ljust(30)  # 热力图列，左对齐，占30个字符
+            title_heatmap = "Heatmap".ljust(50)  # 热力图列，左对齐，占50个字符
             title_time = "Total Time"  # 时间列
             print(f"{title_id} | {title_message} | {title_heatmap} | {title_time}")
             print("-" * 120)  # 分隔线
 
             for result in results:
                 id_str = str(result['id']).ljust(32)  # ID 列左对齐
-                message = result['message'][:18].ljust(20)  # Message 截断到18字符，左对齐
+                message = self.format_column(result['message'], 20)  # 格式化Message列，避免中文字符导致长度问题
                 elapsed_time_seconds = result['total_time']
 
                 # 将秒数格式化为时间字符串
@@ -593,9 +603,9 @@ class HeatmapStats:
                 minutes = int((elapsed_time_seconds % 3600) // 60)
                 seconds = int(elapsed_time_seconds % 60)
 
-                # 计算热力图长度（最大30个█）
-                bar_length = int(elapsed_time_seconds / max_total * 30) if max_total > 0 else 0
-                heatmap = "█" * bar_length + " " * (30 - bar_length)  # 热力图固定30字符
+                # 计算热力图长度（最大50个█）
+                bar_length = int(elapsed_time_seconds / max_total * 50) if max_total > 0 else 0
+                heatmap = "█" * bar_length + " " * (50 - bar_length)
                 print(Fore.YELLOW + f"{id_str}" + Fore.RESET + f" | {message} | " + Fore.BLUE + f"{heatmap}" + Fore.RESET + f" | {days}days, {hours}:{minutes}:{seconds}")
         print()
 
