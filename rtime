@@ -844,27 +844,33 @@ def move_record(id, project_name, task_name):
     cursor = conn.cursor()
     project_id_cursor = conn.cursor()
     task_id_cursor = conn.cursor()
+    cursor.execute("SELECT id FROM records WHERE id = ?", (id,))
+    record_ids = cursor.fetchone()
+    if not record_ids:
+        print(Fore.RED + "Record " +Fore.YELLOW + f"{id}" + Fore.RED + " not found." + Fore.RESET)
+        exit(1)
 
     if task_name:
         project_id_cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
         task_id_cursor.execute("SELECT id FROM tasks WHERE name = ?", (task_name,))
-        project_id = project_id_cursor.fetchone()[0]
-        task_id = task_id_cursor.fetchone()[0]
+        project_id = project_id_cursor.fetchone()
+        task_id = task_id_cursor.fetchone()
         if not project_id or not task_id:
-            print(Fore.YELLOW + f"{project_name}" + Fore.RED + "or" + Fore.YELLOW + f"{task_name}" + Fore.RED + "not found." + Fore.RESET)
-            return
+            print(Fore.YELLOW + f"{project_name}" + Fore.RED + " or " + Fore.YELLOW + f"{task_name}" + Fore.RED + " not found." + Fore.RESET)
+            exit(1)
+
 
         cursor.execute("UPDATE records SET task_id = ?, project_id = ? WHERE id = ?",
-                   (task_id, project_id, id,))
+                   (task_id[0], project_id[0], id,))
     elif project_name:
         project_id_cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
-        project_id = project_id_cursor.fetchone()[0]
+        project_id = project_id_cursor.fetchone()
         if not project_id:
-            print(Fore.YELLOW + f"{project_name}" + Fore.RED + "not found." + Fore.RESET)
-            return
+            print(Fore.YELLOW + f"{project_name}" + Fore.RED + " not found." + Fore.RESET)
+            exit(1)
 
         cursor.execute("UPDATE records SET project_id = ? WHERE id = ?",
-                   (project_id, id,))
+                   (project_id[0], id,))
     else:
         print(Fore.RED + "No project or task specified." + Fore.RESET)
 
