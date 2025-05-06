@@ -986,22 +986,22 @@ def main():
 
     create_task_parser = task_subparsers.add_parser("create", help="Create a new task under a project")
     create_task_parser.add_argument("task", help="Task name", type=str)
-    create_task_parser.add_argument("--project", required=True, help="The project under which the task will be created", type=str)
+    create_task_parser.add_argument("-p", "--project", required=True, help="The project under which the task will be created", type=str)
     create_task_parser.set_defaults(func=lambda args: create_task(args.task, args.project))
 
     delete_task_parser = task_subparsers.add_parser("delete", help="Delete a task from a project")
     delete_task_parser.add_argument("task", help="Task name", type=str)
-    delete_task_parser.add_argument("--project", required=True, help="The project to delete the task from", type=str)
+    delete_task_parser.add_argument("-p", "--project", required=True, help="The project to delete the task from", type=str)
     delete_task_parser.set_defaults(func=lambda args: delete_task(args.task, args.project))
 
     list_tasks_parser = task_subparsers.add_parser("ls", help="List all tasks under a project")
-    list_tasks_parser.add_argument("--project", required=True, help="Project name", type=str)
+    list_tasks_parser.add_argument("-p", "--project", required=True, help="Project name", type=str)
     list_tasks_parser.set_defaults(func=lambda args: list_tasks(args.project))
 
     # 记录时间命令
     track_parser = subparsers.add_parser("track", help="Track time for a task or project")
-    track_parser.add_argument("--project", help="Project name", type=str)
-    track_parser.add_argument("--task", help="Task name", type=str)
+    track_parser.add_argument("-p", "--project", help="Project name", type=str)
+    track_parser.add_argument("-t", "--task", help="Task name", type=str)
     track_parser.add_argument("-m", "--message", required=True, help="Message to attach to the time entry", type=str)
     track_parser.set_defaults(func=lambda args: track_time(args.project, args.task, args.message))
 
@@ -1024,32 +1024,32 @@ def main():
 
     # 热力图输出
     heatmap_parser = subparsers.add_parser("stats", help="Show heatmap status")
-    heatmap_parser.add_argument("--project", help="Project Name", type=str)
-    heatmap_parser.add_argument("--task", help="Task Name", type=str)
-    heatmap_parser.add_argument("--all", help="All projects", action='store_true')
+    heatmap_parser.add_argument("-p", "--project", help="Project Name", type=str)
+    heatmap_parser.add_argument("-t", "--task", help="Task Name", type=str)
+    heatmap_parser.add_argument("-a", "--all", help="All projects", action='store_true')
     heatmap_parser.set_defaults(func=lambda args: handle_heatmap(args.project, args.task, args.all))
 
     time_parser = subparsers.add_parser("time", help="Modify time")
-    time_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
+    time_parser.add_argument("-i", "--id", help="Specify record's id", required=True, type=str)
     time_parser.add_argument("--start_time", help="Start Time(Expected format is: \"YYYY-MM-DD H:M:S\")", type=str)
     time_parser.add_argument("--end_time", help="End Time(Expected format is: \"YYYY-MM-DD H:M:S\")", type=str)
     time_parser.set_defaults(func=lambda args: modify_time(args.id, args.start_time, args.end_time))
 
     move_parser = subparsers.add_parser("mv", help="Move a record under a project or task")
-    move_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
-    move_parser.add_argument("--project", help="Project Name", required=True, type=str)
-    move_parser.add_argument("--task", help="Task Name", type=str)
+    move_parser.add_argument("-i", "--id", help="Specify record's id", required=True, type=str)
+    move_parser.add_argument("-p", "--project", help="Project Name", required=True, type=str)
+    move_parser.add_argument("-t", "--task", help="Task Name", type=str)
     move_parser.set_defaults(func=lambda args: move_record(args.id, args.project, args.task))
 
     msg_parser = subparsers.add_parser("msg", help="Modify a record's msg")
-    msg_parser.add_argument("--id", help="Specify record's id", required=True, type=str)
+    msg_parser.add_argument("-i", "--id", help="Specify record's id", required=True, type=str)
     msg_parser.add_argument("-m", "--message", help="New msg", required=True, type=str)
     msg_parser.set_defaults(func=lambda args: rewrite_msg(args.id, args.message))
 
     rename_parser = subparsers.add_parser("rename", help="Modify a task's or project's name")
-    rename_parser.add_argument("--project", help="Project Name", required=True, type=str)
-    rename_parser.add_argument("--task", help="Task Name", type=str)
-    rename_parser.add_argument("--name", help="New name", required=True, type=str)
+    rename_parser.add_argument("-p", "--project", help="Project Name", required=True, type=str)
+    rename_parser.add_argument("-t", "--task", help="Task Name", type=str)
+    rename_parser.add_argument("-n", "--name", help="New name", required=True, type=str)
     rename_parser.set_defaults(func=lambda args: rewrite_name(args.project, args.task, args.name))
 
     # 解析命令行参delete行相应操作
