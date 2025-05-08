@@ -1068,7 +1068,7 @@ def main():
     delete_parser.set_defaults(func=lambda args: delete_record(args.id))
 
     # 添加PATH
-    path_parser = subparsers.add_parser("path", help="Show DB_PATH(export RTIME_DB_PATH=\"/path/to/your/db\")")
+    path_parser = subparsers.add_parser("path", help="Show DB_PATH\n(export RTIME_DB_PATH=\"/path/to/your/db\" \n export RTIME_GIT_PATH=\"/path/to/your/git repo\")")
     path_parser.set_defaults(func=show_path)
 
     # 热力图输出
@@ -1111,8 +1111,8 @@ def main():
     git_pull_parser = git_subparser.add_parser("pull", help="git pull")
     git_pull_parser.set_defaults(func=git_pull)
 
-    git_commit_parser = git_subparser.add_parser("commit", help="git commit")
-    git_commit_parser.add_argument("-m", "--msg", help="commit msg(use default msg if not set)", type=str)
+    git_commit_parser = git_subparser.add_parser("commit", help="git commit [-m/--message]")
+    git_commit_parser.add_argument("-m", "--message", help="commit msg(use default msg if not set)", type=str)
     git_commit_parser.set_defaults(func=lambda args: git_commit(args.msg))
 
     args = parser.parse_args()
