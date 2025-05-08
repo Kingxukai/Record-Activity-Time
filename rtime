@@ -521,7 +521,7 @@ class HeatmapStats:
             if (word >='\u4e00' and word <= '\u9fa5') or word in ['；','：','，','（','）','！','？','——','……','、','》','《']:
                 count += 1
         if count*2 <= width:
-            return text.ljust(width-count)
+            return text.ljust(width-count)[:width-count]
         else:
             return text[:int(width/2)]
 
