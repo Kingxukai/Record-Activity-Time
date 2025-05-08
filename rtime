@@ -19,6 +19,8 @@ except ImportError:
 # 默认的数据库路径
 DEF_DB_PATH = "~/.config/rtime/rtime.db"
 DB_PATH = ""
+DEF_GIT_PATH = "~/.config/rtime"
+GIT_PATH = ""
 
 # 创建数据库连接
 def get_db_connection():
@@ -471,7 +473,20 @@ def show_path(args=None):
     if os.path.expanduser(DEF_DB_PATH) != DB_PATH:
         print("Default Database Path: " + Fore.YELLOW + f" {os.path.expanduser(DEF_DB_PATH)}" + Fore.RESET)
         print("RTIME_DB_PATH: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
-    print("Database Path: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
+    if not os.path.exists(DB_PATH):
+        print("DB Path: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RED + " but not exists yet" + Fore.RESET)
+    else:
+        print("DB Path: " + Fore.YELLOW + f"{DB_PATH}" + Fore.RESET)
+
+    print("-"*60)
+
+    if os.path.expanduser(DEF_GIT_PATH) != GIT_PATH:
+        print("Default Git Path: " + Fore.YELLOW + f" {os.path.expanduser(DEF_GIT_PATH)}" + Fore.RESET)
+        print("RTIME_GIT_PATH: " + Fore.YELLOW + f"{GIT_PATH}" + Fore.RESET)
+    if not os.path.exists(GIT_PATH):
+        print("Git Path: " + Fore.YELLOW + f"{GIT_PATH}" + Fore.RED + " but not exists yet" + Fore.RESET)
+    else:
+        print("Git Path: " + Fore.YELLOW + f"{GIT_PATH}" + Fore.RESET)
 
 def parse_time(timestr):
     try:
@@ -951,6 +966,40 @@ def rewrite_name(project_name, task_name, new_name):
     conn.close()
     print(Fore.GREEN + "Name updated successfully." + Fore.RESET)
 
+def execute_git_command(command):
+    """在指定目录下执行 Git 命令"""
+    try:
+        # 切换到指定目录
+        os.chdir(GIT_PATH)
+        
+        # 执行命令并获取输出
+        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(Fore.GREEN + result.stdout.decode() + Fore.RESET)  # 打印命令输出
+        if result.stderr:
+            print(Fore.RED + result.stderr.decode() + Fore.RESET)  # 打印错误输出（如果有的话）
+    except subprocess.CalledProcessError as e:
+        print(Fore.RED + f"Error executing command: {e}" + Fore.RESET)
+    except Exception as e:
+        print(Fore.RED + f"An error occurred: {e}" + Fore.RESET)
+
+def git_commit(msg):
+    """执行 git commit 操作"""
+    today_date = datetime.today().strftime('%Y-%m-%d')  # 获取今天的日期
+    def_commit_message = f'update {today_date}'
+    if not msg:
+        command = f'git commit -am "{def_commit_message}" -s'
+    else:
+        command = f'git commit -am "{msg}" -s'
+    execute_git_command(command)
+
+def git_push(args):
+    """执行 git push 操作"""
+    execute_git_command("git push")
+
+def git_pull(args):
+    """执行 git pull 操作"""
+    execute_git_command("git pull")
+
 # 主函数
 def main():
     parser = argparse.ArgumentParser(prog="rtime")
@@ -1052,7 +1101,20 @@ def main():
     rename_parser.add_argument("-n", "--name", help="New name", required=True, type=str)
     rename_parser.set_defaults(func=lambda args: rewrite_name(args.project, args.task, args.name))
 
-    # 解析命令行参delete行相应操作
+    # git
+    git_parser = subparsers.add_parser("git", help="Use git to sync db in GIT_PATH")
+    git_subparser = git_parser.add_subparsers()
+
+    git_push_parser = git_subparser.add_parser("push", help="git push")
+    git_push_parser.set_defaults(func=git_push)
+
+    git_pull_parser = git_subparser.add_parser("pull", help="git pull")
+    git_pull_parser.set_defaults(func=git_pull)
+
+    git_commit_parser = git_subparser.add_parser("commit", help="git commit")
+    git_commit_parser.add_argument("-m", "--msg", help="commit msg(use default msg if not set)", type=str)
+    git_commit_parser.set_defaults(func=lambda args: git_commit(args.msg))
+
     args = parser.parse_args()
 
     if hasattr(args, 'func'):  # 检查是否有 'func' 属性
@@ -1060,15 +1122,21 @@ def main():
     else:
         print("No command specified, use -h for help.")  # 如果没有指定命令，则打印提示
 
-def set_db_path():
+def set_path():
     # 设置DB_PATH
     global DB_PATH
     DB_PATH = os.getenv("RTIME_DB_PATH", DEF_DB_PATH)
-    if DB_PATH and DB_PATH == "":
+    if DB_PATH == "":
         DB_PATH = DEF_DB_PATH
     DB_PATH = os.path.expanduser(DB_PATH)
 
+    global GIT_PATH
+    GIT_PATH = os.getenv("RTIME_GIT_PATH", DEF_GIT_PATH)
+    if GIT_PATH == "":
+        GIT_PATH = DEF_GIT_PATH
+    GIT_PATH = os.path.expanduser(GIT_PATH)
+
 if __name__ == "__main__":
     init() # init color font
-    set_db_path()
+    set_path()
     main()
