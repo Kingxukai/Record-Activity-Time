@@ -982,8 +982,12 @@ def execute_git_command(command):
     except Exception as e:
         print(Fore.RED + f"An error occurred: {e}" + Fore.RESET)
 
-def git_commit(msg):
+def git_commit(args):
     """执行 git commit 操作"""
+    if args.message:
+        msg = args.message
+    else:
+        msg = None
     today_date = datetime.today().strftime('%Y-%m-%d')  # 获取今天的日期
     def_commit_message = f'update {today_date}'
     if not msg:
@@ -1113,7 +1117,7 @@ def main():
 
     git_commit_parser = git_subparser.add_parser("commit", help="git commit [-m/--message]")
     git_commit_parser.add_argument("-m", "--message", help="commit msg(use default msg if not set)", type=str)
-    git_commit_parser.set_defaults(func=lambda args: git_commit(args.msg))
+    git_commit_parser.set_defaults(func=git_commit)
 
     args = parser.parse_args()
 
